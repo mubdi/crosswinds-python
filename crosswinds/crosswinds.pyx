@@ -13,7 +13,7 @@
 #### IMPORTS ####
 
 import numpy as n
-import time
+import datetime
 cimport numpy as n 
 cimport cython
 from cython.parallel cimport prange, parallel
@@ -269,8 +269,8 @@ def vel_space_corr(n.ndarray[double, ndim=3] dcube,
     cdef int n_x = dcube.shape[0]
     cdef int n_y = dcube.shape[1]
     cdef int n_vr = dcube.shape[2]
-    cdef float starttime = time.time()
-
+    cdef object starttime = datetime.datetime.now()
+ 
     # Mean density per spaxel
     # mean_dens = n.mean(dcube, axis=(0, 1)).reshape((1, 1, n_vr))
     cdef double mean_dens = n.mean(dcube - baseline)
@@ -317,6 +317,7 @@ def vel_space_corr(n.ndarray[double, ndim=3] dcube,
 
 
     print("Number of Procs available: %i" % num_proc)
+    print("Timing: Cross-correlation Started at %s" % str(starttime))
 
     with nogil:
         # Testing the Number of Threads:
@@ -373,10 +374,12 @@ def vel_space_corr(n.ndarray[double, ndim=3] dcube,
 
     # Printing stats on completion 
 
-    cdef float endtime = time.time()
-    cdef float time_taken = endtime - starttime
+    cdef object endtime = datetime.datetime.now()
+    cdef float time_taken = 0.0
+    time_taken = (endtime - starttime).total_seconds()
 
-    print("Number of Threads: %i" % num_threads)
+    print("Number of Threads Used: %i" % num_threads)
+    print("Timing: Cross-correlation Finished at %s" % str(endtime))
     print("Timing: The cross-correlation took %1.4f seconds" % time_taken)
 
     return final_corr, final_err, corr_cells
