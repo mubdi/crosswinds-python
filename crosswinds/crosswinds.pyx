@@ -347,16 +347,22 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
     cdef n.ndarray[int, ndim=1] tmp_vel_inds
     cdef n.ndarray[double, ndim=1] tmp_data_vals
     cdef object spa_tree, vel_tree
+    cdef n.ndarray[int, ndim=2] g_xi, g_yi, s_ind_arr
+    cdef n.ndarray[int, ndim=1] v_ind_arr
 
     #### The Cross-Correlation Algorithm:
 
     # Setting up spatial grids + kd-tree:
     g_x, g_y = n.meshgrid(c_x, c_y)
+    g_xi, g_yi = n.mgrid[0:n_x, 0:n_y]
     s_pts_arr = n.column_stack([g_x.ravel(), g_y.ravel()])
+    s_ind_arr = n.column_stack([g_xi.ravel(), g_yi.ravel()])
+
     spa_tree = spatial.cKDTree(s_pts_arr)
 
     # Setting up velocity grid + kd-tree:
     v_pts_arr = c_vr.reshape(-1, 1)
+    v_ind_arr = n.arange(n_vr)
     vel_tree = spatial.cKDTree(v_pts_arr)
 
     for i_bin_r in range(n_bin_r):
@@ -378,7 +384,7 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
                     tmp_rad_inds_u = set(spa_tree.query_ball_point([c_xi, c_yi], rmax))
                     tmp_rad_inds_d = set(spa_tree.query_ball_point([c_xi, c_yi], rmin))
 
-                    tmp_rad_inds = s_pts_arr[list(tmp_rad_inds_u - tmp_rad_inds_d)]
+                    tmp_rad_inds = s_ind_arr[list(tmp_rad_inds_u - tmp_rad_inds_d)]
 
                     if tmp_rad_inds.shape[0] == 0: continue
 
@@ -386,16 +392,17 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
                     tmp_data_slice = norm_dcube[tmp_rad_inds[:,0], tmp_rad_inds[:,1],:]
 
                     for i_vr in range(n_vr):
+
+                        # Checking on if there's signal here:
+                        tmpweight = weight[i_x, i_y, i_vr]
+                        if tmpweight <= 0: continue
+
                         c_vri=c_vr[i_vr]
 
-                        tmpweight = weight[i_x, i_y, i_vr]
-
-                        if tmpweight <= 0: continue
 
                         tmp_vel_inds_u = set(vel_tree.query_ball_point([c_vri], vmax))
                         tmp_vel_inds_d = set(vel_tree.query_ball_point([c_vri], vmin))
-
-                        tmp_vel_inds = v_pts_arr[list(tmp_vel_inds_u - tmp_vel_inds_d)]
+                        tmp_vel_inds = v_ind_arr[list(tmp_vel_inds_u - tmp_vel_inds_d)]
 
                         if tmp_vel_inds.shape[0] == 0: continue
 
