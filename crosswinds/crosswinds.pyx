@@ -354,7 +354,7 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
 
     # Setting up spatial grids + kd-tree:
     g_x, g_y = n.meshgrid(c_x, c_y)
-    g_xi, g_yi = n.int_(n.mgrid[0:n_x, 0:n_y])
+    g_xi, g_yi = n.meshgrid(n.arange(n_x), n.arange(n_y))
     s_pts_arr = n.column_stack([g_x.ravel(), g_y.ravel()])
     s_ind_arr = n.column_stack([g_xi.ravel(), g_yi.ravel()])
 
