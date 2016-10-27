@@ -252,17 +252,43 @@ def space_corr_2d(dcube, c_x, c_y, binpts, mass=True, norm=False,
 
     return final_corr, final_err
 
-@cython.wraparound(False)
-@cython.boundscheck(False)
 def vel_space_corr(n.ndarray[double, ndim=3] dcube, 
-                   n.ndarray[double, ndim=1] c_x, 
+                   n.ndarray[double, ndim=1] c_x,
                    n.ndarray[double, ndim=1] c_y, 
                    n.ndarray[double, ndim=1] c_vr, 
                    n.ndarray[double, ndim=1] binpts_r, 
                    n.ndarray[double, ndim=1] binpts_v,
                    bint norm=False, 
                    double baseline=0.0,
-                   bint debug=False):
+                   bint debug=False,
+                   string mode='bf'):
+    """
+    Convenience Function for various algorithms for 2D+1D
+    Position + Velocity Cross-correlation  
+    """
+
+    if mode == 'bf':
+        retval = vel_space_corr_bf(dcube, c_x, c_y, c_vr,
+                                   binpts_r, binpts_v,
+                                   norm=norm, baseline=baseline,
+                                   debug=debug)
+
+    else:
+        print("Your mode \"%s\" was not recognized." % mode)
+
+    return = retval
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+def vel_space_corr_bf(n.ndarray[double, ndim=3] dcube, 
+                      n.ndarray[double, ndim=1] c_x, 
+                      n.ndarray[double, ndim=1] c_y, 
+                      n.ndarray[double, ndim=1] c_vr, 
+                      n.ndarray[double, ndim=1] binpts_r, 
+                      n.ndarray[double, ndim=1] binpts_v,
+                      bint norm=False, 
+                      double baseline=0.0,
+                      bint debug=False):
 
     cdef int n_bin_r = n.size(binpts_r) - 1
     cdef int n_bin_v = n.size(binpts_v) - 1
