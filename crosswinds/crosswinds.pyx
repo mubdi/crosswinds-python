@@ -378,7 +378,9 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
                     tmp_rad_inds_u = set(spa_tree.query_ball_point([c_xi, c_yi], rmax))
                     tmp_rad_inds_d = set(spa_tree.query_ball_point([c_xi, c_yi], rmin))
 
-                    tmp_rad_inds = n.array(list(tmp_rad_inds_u - tmp_rad_inds_d))
+                    tmp_rad_inds = s_pts_arr[list(tmp_rad_inds_u - tmp_rad_inds_d)]
+
+                    if tmp_rad_inds.shape[0] == 0: continue
 
                     # 2-D Array of just spatially localized pixels
                     tmp_data_slice = norm_dcube[tmp_rad_inds[:,0], tmp_rad_inds[:,1],:]
@@ -388,20 +390,22 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
 
                         tmpweight = weight[i_x, i_y, i_vr]
 
-                        if tmpweight > 0:
+                        if tmpweight <= 0: continue
 
-                            tmp_vel_inds_u = set(vel_tree.query_ball_point([c_vri], vmax))
-                            tmp_vel_inds_d = set(vel_tree.query_ball_point([c_vri], vmin))
+                        tmp_vel_inds_u = set(vel_tree.query_ball_point([c_vri], vmax))
+                        tmp_vel_inds_d = set(vel_tree.query_ball_point([c_vri], vmin))
 
-                            tmp_vel_inds = n.array(list(tmp_vel_inds_u - tmp_vel_inds_d))
+                        tmp_vel_inds = v_pts_arr[list(tmp_vel_inds_u - tmp_vel_inds_d)]
 
-                            tmp_data_vals = tmp_data_slice[:,tmp_vel_inds].flatten()
-                            ncell = tmp_data_vals.size
+                        if tmp_vel_inds.shape[0] == 0: continue
 
-                            if ncell > 0:
-                                corr_mean_cube[i_bin_r, i_bin_v] += weight * n.mean(tmp_data_vals)
-                                corr_std_cube[i_bin_r, i_bin_v] += weight * n.std(tmp_data_vals)
-                                corr_cells[i_bin_r, i_bin_v] += ncell
+                        tmp_data_vals = tmp_data_slice[:,tmp_vel_inds].flatten()
+                        ncell = tmp_data_vals.size
+
+                        if ncell > 0:
+                            corr_mean_cube[i_bin_r, i_bin_v] += weight * n.mean(tmp_data_vals)
+                            corr_std_cube[i_bin_r, i_bin_v] += weight * n.std(tmp_data_vals)
+                            corr_cells[i_bin_r, i_bin_v] += ncell
 
 
     #### Finishing Up
