@@ -279,7 +279,7 @@ def vel_space_corr(n.ndarray[double, ndim=3] dcube,
     else:
         print("Your mode \"%s\" was not recognized." % mode)
 
-    return = retval
+    return retval
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
