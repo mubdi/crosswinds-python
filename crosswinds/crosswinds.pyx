@@ -19,6 +19,9 @@ cimport cython
 from cython.parallel cimport prange, parallel
 cimport openmp
 
+# Needed for KD-Tree implementation
+from scipy import spatial
+
 #### DEFINED VARIABLES ####
 
 DTYPE = n.double
@@ -280,6 +283,151 @@ def vel_space_corr(n.ndarray[double, ndim=3] dcube,
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
+def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube, 
+                      n.ndarray[double, ndim=1] c_x, 
+                      n.ndarray[double, ndim=1] c_y, 
+                      n.ndarray[double, ndim=1] c_vr, 
+                      n.ndarray[double, ndim=1] binpts_r, 
+                      n.ndarray[double, ndim=1] binpts_v,
+                      bint norm=False, 
+                      double baseline=0.0,
+                      bint debug=False):
+
+    cdef int n_bin_r = n.size(binpts_r) - 1
+    cdef int n_bin_v = n.size(binpts_v) - 1
+    cdef int n_x = dcube.shape[0]
+    cdef int n_y = dcube.shape[1]
+    cdef int n_vr = dcube.shape[2]
+    cdef object starttime = datetime.datetime.now()
+
+    # Determining Mean Density per Spaxel
+    cdef double mean_dens = n.mean(dcube - baseline)
+
+    cdef n.ndarray[double, ndim=3] norm_dcube, weight
+
+    if norm:
+        norm_dcube = (dcube - mean_dens) / mean_dens
+    else:
+        norm_dcube = (dcube - baseline) / mean_dens
+
+    # Where the Cross-correlation Mean will go:
+    cdef n.ndarray[double, ndim=2] corr_mean_cube = n.zeros(
+        (n_bin_r, n_bin_v))
+
+    # Where the number of cells will go:
+    cdef n.ndarray[double, ndim=2] corr_cells = n.zeros(
+        (n_bin_r, n_bin_v))
+
+    # Where the Standard Deviation will go:
+    cdef n.ndarray[double, ndim=2] corr_std_cube = n.zeros(
+        (n_bin_r, n_bin_v))
+
+    # Determing weighting:
+    # Filtering Negative Numbers in weighting:
+
+    weight = n.copy(dcube - baseline)
+    weight[n.where(weight < 0)] = 0.0
+
+    weight = weight / n.sum(weight)  # Sum to 1
+
+    # Stats on OpenMP threads
+    cdef int num_threads, num_proc
+    num_proc = openmp.omp_get_num_procs()
+
+    print("Number of Procs available: %i" % num_proc)
+    print("Timing: Cross-correlation Started at %s" % str(starttime))
+
+    cdef int i_x, i_y, i_vr, i_bin_r, i_bin_v
+    cdef double rmin, rmax, vrmin, vrmax
+    cdef double c_xi, c_yi, c_vri
+    cdef double sumx, sumx2, ncell, meanval, stdval, tmpweight
+    cdef set tmp_rad_inds_u, tmp_rad_inds_d, tmp_vel_inds_u, tmp_vel_inds_d
+    cdef n.ndarray[int, ndim=2] tmp_rad_inds
+    cdef n.ndarray[double, ndim=2] tmp_data_slice, g_x, g_y, s_pts_arr
+    cdef n.ndarray[int, ndim=1] tmp_vel_inds
+    cdef n.ndarray[double, ndim=1] tmp_data_vals, v_pts_arr
+    cdef object spa_tree, vel_tree
+
+    #### The Cross-Correlation Algorithm:
+
+    # Setting up spatial grids + kd-tree:
+    g_x, g_y = n.meshgrid(c_x, c_y)
+    s_pts_arr = n.column_stack([g_x.ravel(), g_y.ravel()])
+    spa_tree = spatial.cKDTree(s_pts_arr)
+
+    # Setting up velocity grid + kd-tree:
+    v_pts_arr = c_vr.reshape(-1, 1)
+    vel_tree = spatial.cKDTree(v_pts_arr)
+
+    for i_bin_r in range(n_bin_r):
+        rmin = binpts_r[i_bin_r]
+        rmax = binpts_r[i_bin_r + 1]
+
+        for i_bin_v in range(n_bin_v):
+            vmin = binpts_v[i_bin_v]
+            vmax = binpts_v[i_bin_v + 1]
+
+            # Number of Threads
+            num_threads = openmp.omp_get_num_threads()
+
+            for i_x in range(n_x):
+                c_xi=c_x[i_x]
+                for i_y in range(n_y):
+                    c_yi=c_y[i_y]
+
+                    tmp_rad_inds_u = set(spa_tree.query_ball_point([c_xi, c_yi], rmax))
+                    tmp_rad_inds_d = set(spa_tree.query_ball_point([c_xi, c_yi], rmin))
+
+                    tmp_rad_inds = n.array(list(tmp_rad_inds_u - tmp_rad_inds_d))
+
+                    # 2-D Array of just spatially localized pixels
+                    tmp_data_slice = norm_dcube[tmp_rad_inds[:,0], tmp_rad_inds[:,1],:]
+
+                    for i_vr in range(n_vr):
+                        c_vri=c_vr[i_vr]
+
+                        tmpweight = weight[i_x, i_y, i_vr]
+
+                        if tmpweight > 0:
+
+                            tmp_vel_inds_u = set(vel_tree.query_ball_point([c_vri], vmax))
+                            tmp_vel_inds_d = set(vel_tree.query_ball_point([c_vri], vmin))
+
+                            tmp_vel_inds = n.array(list(tmp_vel_inds_u - tmp_vel_inds_d))
+
+                            tmp_data_vals = tmp_data_slice[:,tmp_vel_inds].flatten()
+                            ncell = tmp_data_vals.size
+
+                            if ncell > 0:
+                                corr_mean_cube[i_bin_r, i_bin_v] += weight * n.mean(tmp_data_vals)
+                                corr_std_cube[i_bin_r, i_bin_v] += weight * n.std(tmp_data_vals)
+                                corr_cells[i_bin_r, i_bin_v] += ncell
+
+
+    #### Finishing Up
+
+    # Number of sampling points:
+    cdef int n_samp_pts = n_x * n_y * n_vr
+    cdef n.ndarray[double, ndim=2] final_corr, final_err
+
+    final_corr = corr_mean_cube
+    final_err = n.sqrt(corr_std_cube)
+
+    # Printing stats on completion 
+
+    cdef object endtime = datetime.datetime.now()
+    cdef float time_taken = 0.0
+    time_taken = (endtime - starttime).total_seconds()
+
+    print("Number of Threads Used: %i" % num_threads)
+    print("Timing: Cross-correlation Finished at %s" % str(endtime))
+    print("Timing: The cross-correlation took %1.4f seconds" % time_taken)
+
+    return final_corr, final_err, corr_cells
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
 def vel_space_corr_bf(n.ndarray[double, ndim=3] dcube, 
                       n.ndarray[double, ndim=1] c_x, 
                       n.ndarray[double, ndim=1] c_y, 
@@ -330,12 +478,12 @@ def vel_space_corr_bf(n.ndarray[double, ndim=3] dcube,
     cdef double sumx, sumx2, ncell, meanval, stdval, tmpweight
     cdef double *arr1 
 
+    # Stats on OpenMP threads
     cdef int num_threads, num_proc
     num_proc = openmp.omp_get_num_procs()
 
     # Determing weighting:
     # Filtering Negative Numbers in weighting:
-
     weight = n.copy(dcube - baseline)
     weight[n.where(weight < 0)] = 0.0
 
