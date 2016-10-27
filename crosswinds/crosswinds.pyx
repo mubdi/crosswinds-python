@@ -343,9 +343,9 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
     cdef double sumx, sumx2, ncell, meanval, stdval, tmpweight
     cdef set tmp_rad_inds_u, tmp_rad_inds_d, tmp_vel_inds_u, tmp_vel_inds_d
     cdef n.ndarray[int, ndim=2] tmp_rad_inds
-    cdef n.ndarray[double, ndim=2] tmp_data_slice, g_x, g_y, s_pts_arr
+    cdef n.ndarray[double, ndim=2] tmp_data_slice, g_x, g_y, s_pts_arr, v_pts_arr
     cdef n.ndarray[int, ndim=1] tmp_vel_inds
-    cdef n.ndarray[double, ndim=1] tmp_data_vals, v_pts_arr
+    cdef n.ndarray[double, ndim=1] tmp_data_vals
     cdef object spa_tree, vel_tree
 
     #### The Cross-Correlation Algorithm:
