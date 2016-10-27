@@ -264,7 +264,7 @@ def vel_space_corr(n.ndarray[double, ndim=3] dcube,
                    bint norm=False, 
                    double baseline=0.0,
                    bint debug=False,
-                   string mode='bf'):
+                   str mode='bf'):
     """
     Convenience Function for various algorithms for 2D+1D
     Position + Velocity Cross-correlation  
