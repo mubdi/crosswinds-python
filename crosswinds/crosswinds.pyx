@@ -342,13 +342,13 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
     cdef double c_xi, c_yi, c_vri
     cdef double sumx, sumx2, ncell, meanval, stdval, tmpweight
     cdef set tmp_rad_inds_u, tmp_rad_inds_d, tmp_vel_inds_u, tmp_vel_inds_d
-    cdef n.ndarray[int, ndim=2] tmp_rad_inds
+    cdef n.ndarray[long, ndim=2] tmp_rad_inds
     cdef n.ndarray[double, ndim=2] tmp_data_slice, g_x, g_y, s_pts_arr, v_pts_arr
-    cdef n.ndarray[int, ndim=1] tmp_vel_inds
+    cdef n.ndarray[long, ndim=1] tmp_vel_inds
     cdef n.ndarray[double, ndim=1] tmp_data_vals
     cdef object spa_tree, vel_tree
-    cdef n.ndarray[int, ndim=2] g_xi, g_yi, s_ind_arr
-    cdef n.ndarray[int, ndim=1] v_ind_arr
+    cdef n.ndarray[long, ndim=2] g_xi, g_yi, s_ind_arr
+    cdef n.ndarray[long, ndim=1] v_ind_arr
 
     #### The Cross-Correlation Algorithm:
 
@@ -410,8 +410,8 @@ def vel_space_corr_kd(n.ndarray[double, ndim=3] dcube,
                         ncell = tmp_data_vals.size
 
                         if ncell > 0:
-                            corr_mean_cube[i_bin_r, i_bin_v] += weight * n.mean(tmp_data_vals)
-                            corr_std_cube[i_bin_r, i_bin_v] += weight * n.std(tmp_data_vals)
+                            corr_mean_cube[i_bin_r, i_bin_v] += tmpweight * n.mean(tmp_data_vals)
+                            corr_std_cube[i_bin_r, i_bin_v] += tmpweight * n.std(tmp_data_vals)
                             corr_cells[i_bin_r, i_bin_v] += ncell
 
 
